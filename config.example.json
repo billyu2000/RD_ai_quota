@@ -1,0 +1,9 @@
+{
+  "interval_ms": 5000,
+  "order": ["claude", "codex", "grok", "zai"],
+  "brightness": 180,
+  "paused": false,
+  "poll_seconds": 30,
+  "port": "",
+  "zai_api_key": ""
+}
