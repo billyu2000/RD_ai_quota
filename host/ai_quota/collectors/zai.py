@@ -53,12 +53,18 @@ def collect(explicit_key: str = "") -> dict[str, Any]:
         {"Authorization": key, "Content-Type": "application/json"},
     )
     if status != 200 or not isinstance(data, dict) or not data.get("success"):
+        detail = ""
+        if isinstance(data, dict):
+            msg = data.get("msg") or data.get("message")
+            detail = f": {msg or data.get('code') or 'unsuccessful response'}"
+        elif isinstance(data, str) and data.strip():
+            detail = f": {data.strip()[:120]}"
         return {
             "id": "zai",
             "name": NAME,
             "status": "error",
             "windows": [],
-            "error": f"HTTP {status}",
+            "error": f"HTTP {status}{detail}",
         }
 
     windows: list[dict[str, Any]] = []

@@ -78,6 +78,34 @@ static void draw_waiting() {
   tft.drawString("AI Quota", 160, 64, 4);
   tft.setTextColor(rgb(140, 140, 150), rgb(12, 12, 16));
   tft.drawString("waiting for Mac", 160, 104, 2);
+  tft.setTextColor(rgb(90, 90, 100), rgb(12, 12, 16));
+  tft.drawString("hold BOOT 3s = wifi setup", 160, 150, 1);
+}
+
+static void draw_portal_screen() {
+  tft.fillScreen(rgb(12, 12, 16));
+  tft.setTextDatum(MC_DATUM);
+  tft.setTextColor(rgb(220, 220, 220), rgb(12, 12, 16));
+  tft.drawString("AI Quota Setup", 160, 38, 4);
+  tft.setTextColor(rgb(120, 200, 160), rgb(12, 12, 16));
+  tft.drawString("join WiFi:", 160, 76, 2);
+  tft.setTextColor(rgb(240, 240, 245), rgb(12, 12, 16));
+  tft.drawString("AI-Quota-Setup", 160, 98, 2);
+  tft.setTextColor(rgb(120, 200, 160), rgb(12, 12, 16));
+  tft.drawString("then open", 160, 124, 2);
+  tft.setTextColor(rgb(240, 240, 245), rgb(12, 12, 16));
+  tft.drawString("http://192.168.4.1", 160, 148, 2);
+}
+
+void draw_transport_badge(const AppState &state) {
+  if (state.portal_mode) return;
+  int x = 316;
+  if (state.server_up) {
+    tft.fillCircle(x, 17, 4, rgb(52, 211, 153));
+    tft.drawCircle(x, 17, 6, rgb(52, 211, 153));
+  } else if (state.wifi_up) {
+    tft.fillCircle(x, 17, 4, rgb(251, 191, 36));
+  }
 }
 
 static void draw_stale_badge() {
@@ -105,8 +133,13 @@ void display_set_brightness(uint8_t brightness) {
 }
 
 void display_render(const AppState &state) {
+  if (state.portal_mode) {
+    draw_portal_screen();
+    return;
+  }
   if (!state.has_quota || state.n_order == 0) {
     draw_waiting();
+    draw_transport_badge(state);
     return;
   }
 
@@ -208,4 +241,6 @@ void display_render(const AppState &state) {
     uint16_t c = (i == page) ? brand : rgb(60, 60, 68);
     tft.fillCircle(start + i * 12, 158, 3, c);
   }
+
+  draw_transport_badge(state);
 }

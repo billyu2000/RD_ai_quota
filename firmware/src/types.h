@@ -33,4 +33,7 @@ struct AppState {
   uint32_t last_quota_ms;
   uint8_t page;
   bool dirty;
+  bool portal_mode;
+  bool wifi_up;
+  bool server_up;
 };

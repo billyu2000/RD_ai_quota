@@ -17,7 +17,8 @@ COLLECTORS: dict[str, Callable[..., dict[str, Any]]] = {
 
 
 def collect_all(cfg: dict[str, Any]) -> list[dict[str, Any]]:
-    order = list(cfg.get("order") or COLLECTORS.keys())
+    disabled = set(cfg.get("disabled") or [])
+    order = [p for p in (cfg.get("order") or COLLECTORS.keys()) if p not in disabled]
     results: dict[str, dict[str, Any]] = {}
 
     def run(pid: str) -> tuple[str, dict[str, Any]]:

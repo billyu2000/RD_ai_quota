@@ -3,7 +3,9 @@
   "order": ["claude", "codex", "grok", "zai"],
   "brightness": 180,
   "paused": false,
+  "disabled": [],
   "poll_seconds": 30,
   "port": "",
+  "listen_port": 8788,
   "zai_api_key": ""
 }

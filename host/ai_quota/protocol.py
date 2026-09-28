@@ -66,11 +66,13 @@ def quota_frame(providers: list[dict[str, Any]]) -> str:
 
 
 def config_frame(cfg: dict[str, Any]) -> str:
+    disabled = set(cfg.get("disabled") or [])
+    order = [x for x in cfg["order"] if x not in disabled]
     return json.dumps(
         {
             "type": "config",
             "interval_ms": int(cfg["interval_ms"]),
-            "order": list(cfg["order"]),
+            "order": order,
             "brightness": int(cfg["brightness"]),
             "paused": bool(cfg["paused"]),
         },

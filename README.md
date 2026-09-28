@@ -24,11 +24,25 @@ pio run -t upload
 
 If upload fails: hold **BOOT**, tap **RST**, release **BOOT**, then retry.
 
-## Run the Mac daemon
+## Mac menu bar app
+
+Double-click `macos/AI Quota.app`, or:
+
+```bash
+./run.sh app
+```
+
+A status item appears on the right of the menu bar (`C35 X0 G68 Z1`). Click it for per-provider 5h / weekly numbers, USB status, pause, and rotation interval.
+
+To open at login: System Settings → General → Login Items → add **AI Quota**.
+
+The terminal daemon still works:
 
 ```bash
 ./run.sh run
 ```
+
+Use only one of `app` or `run` at a time so they do not share the USB port.
 
 Settings (picked up live, no reboot):
 

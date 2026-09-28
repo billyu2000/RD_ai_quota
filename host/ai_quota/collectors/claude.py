@@ -13,19 +13,28 @@ NAME = "Claude"
 CACHE_STALE_S = 30 * 60
 
 
-def _http_get(url: str, headers: dict[str, str]) -> tuple[int, Any]:
-    req = Request(url, headers=headers, method="GET")
-    try:
-        with urlopen(req, timeout=10) as resp:
-            raw = resp.read().decode("utf-8")
-            try:
-                return resp.status, json.loads(raw)
-            except json.JSONDecodeError:
-                return resp.status, raw
-    except HTTPError as exc:
-        return exc.code, exc.reason
-    except (URLError, TimeoutError, OSError) as exc:
-        return 0, str(exc)
+def _http_get(url: str, headers: dict[str, str], retries: int = 0) -> tuple[int, Any]:
+    for attempt in range(retries + 1):
+        req = Request(url, headers=headers, method="GET")
+        try:
+            with urlopen(req, timeout=10) as resp:
+                raw = resp.read().decode("utf-8")
+                try:
+                    return resp.status, json.loads(raw)
+                except json.JSONDecodeError:
+                    return resp.status, raw
+        except HTTPError as exc:
+            if exc.code == 429 and attempt < retries:
+                try:
+                    delay = min(float(exc.headers.get("retry-after") or 2), 5.0)
+                except (TypeError, ValueError):
+                    delay = 2.0
+                time.sleep(delay)
+                continue
+            return exc.code, exc.reason
+        except (URLError, TimeoutError, OSError) as exc:
+            return 0, str(exc)
+    return 0, "retries exhausted"
 
 
 def _resets_in(iso_time: str | None) -> int:
@@ -38,8 +47,9 @@ def _resets_in(iso_time: str | None) -> int:
         return -1
 
 
-def _windows_from_usage(data: dict[str, Any]) -> list[dict[str, Any]]:
+def _windows_from_usage(data: dict[str, Any], drop_expired: bool = False) -> list[dict[str, Any]]:
     windows = []
+    now = datetime.now(timezone.utc)
     for key, label in (("five_hour", "5h"), ("seven_day", "7d")):
         block = data.get(key)
         if not isinstance(block, dict):
@@ -47,6 +57,13 @@ def _windows_from_usage(data: dict[str, Any]) -> list[dict[str, Any]]:
         used = block.get("utilization")
         if not isinstance(used, (int, float)):
             continue
+        if drop_expired and isinstance(block.get("resets_at"), str):
+            try:
+                reset = datetime.fromisoformat(block["resets_at"].replace("Z", "+00:00"))
+                if reset <= now:
+                    continue
+            except ValueError:
+                pass
         windows.append(
             {
                 "label": label,
@@ -95,16 +112,39 @@ def _cached(max_age: float | None = CACHE_STALE_S) -> dict[str, Any] | None:
     util = cached.get("utilization")
     if not isinstance(util, dict):
         return None
-    windows = _windows_from_usage(util)
+    windows = _windows_from_usage(util, drop_expired=True)
     if not windows:
         return None
     return {"id": "claude", "name": NAME, "status": "ok", "windows": windows, "source": "cache"}
 
 
+LAST_GOOD_MAX_AGE_S = 10 * 60
+API_MIN_INTERVAL_S = 60
+_last_good_usage: dict[str, Any] | None = None
+_last_good_ts = 0.0
+
+
+def _from_last_good(source: str) -> dict[str, Any] | None:
+    if _last_good_usage is None:
+        return None
+    windows = _windows_from_usage(_last_good_usage, drop_expired=True)
+    if not windows:
+        return None
+    return {"id": "claude", "name": NAME, "status": "ok", "windows": windows, "source": source}
+
+
 def collect() -> dict[str, Any]:
+    global _last_good_usage, _last_good_ts
+
     fresh = _cached(120)
     if fresh:
         return fresh
+
+    now = time.time()
+    if now - _last_good_ts < API_MIN_INTERVAL_S:
+        recent = _from_last_good("last-good")
+        if recent:
+            return recent
 
     token = _oauth_token()
     if token:
@@ -115,11 +155,18 @@ def collect() -> dict[str, Any]:
                 "anthropic-beta": "oauth-2025-04-20",
                 "Content-Type": "application/json",
             },
+            retries=2,
         )
         if status == 200 and isinstance(data, dict):
             windows = _windows_from_usage(data)
             if windows:
-                return {"id": "claude", "name": NAME, "status": "ok", "windows": windows}
+                _last_good_usage = data
+                _last_good_ts = time.time()
+                return {"id": "claude", "name": NAME, "status": "ok", "windows": windows, "source": "api"}
+        if time.time() - _last_good_ts <= LAST_GOOD_MAX_AGE_S:
+            recent = _from_last_good("last-good")
+            if recent:
+                return recent
         cached = _cached(None)
         if cached:
             return cached

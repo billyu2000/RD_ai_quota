@@ -1,0 +1,8 @@
+#!/bin/zsh
+set -e
+HERE="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$HERE/../../../.." && pwd)"
+export PYTHONUNBUFFERED=1
+mkdir -p "$HOME/.config/ai-quota"
+cd "$ROOT/host"
+exec "$ROOT/.venv/bin/python" -m ai_quota app >> "$HOME/.config/ai-quota/app.log" 2>&1

@@ -2,9 +2,16 @@
 
 #include <ArduinoJson.h>
 
+#include "net.h"
+
 static const size_t kLineMax = 2048;
 static char line_buf[kLineMax];
 static size_t line_len = 0;
+
+static void reply(const char *line) {
+  Serial.println(line);
+  net_send_line(line);
+}
 
 static int window_rank(const char *label) {
   if (!label || !label[0]) return 9;
@@ -113,22 +120,24 @@ static void handle_line(AppState &state, char *line) {
   JsonDocument doc;
   DeserializationError err = deserializeJson(doc, line);
   if (err) {
-    Serial.print("{\"type\":\"err\",\"msg\":\"");
-    Serial.print(err.c_str());
-    Serial.println("\"}");
+    char msg[96];
+    snprintf(msg, sizeof(msg), "{\"type\":\"err\",\"msg\":\"%s\"}", err.c_str());
+    reply(msg);
     return;
   }
   const char *type = doc["type"] | "";
   if (strcmp(type, "quota") == 0) {
     apply_quota(state, doc);
-    Serial.println("{\"type\":\"ack\",\"what\":\"quota\"}");
+    reply("{\"type\":\"ack\",\"what\":\"quota\"}");
   } else if (strcmp(type, "config") == 0) {
     apply_config(state, doc);
-    Serial.println("{\"type\":\"ack\",\"what\":\"config\"}");
+    reply("{\"type\":\"ack\",\"what\":\"config\"}");
   } else if (strcmp(type, "ping") == 0) {
-    Serial.println("{\"type\":\"pong\"}");
+    reply("{\"type\":\"pong\"}");
   }
 }
+
+void protocol_feed(AppState &state, char *line) { handle_line(state, line); }
 
 void protocol_begin() {
   Serial.setRxBufferSize(4096);
@@ -141,13 +150,13 @@ void protocol_begin() {
 }
 
 void protocol_send_hello() {
-  Serial.println("{\"type\":\"hello\",\"board\":\"t-display-s3\",\"fw\":\"0.1.0\"}");
+  reply("{\"type\":\"hello\",\"board\":\"t-display-s3\",\"fw\":\"0.2.0\"}");
 }
 
 void protocol_send_event(const char *name) {
-  Serial.print("{\"type\":\"event\",\"btn\":\"");
-  Serial.print(name);
-  Serial.println("\"}");
+  char msg[64];
+  snprintf(msg, sizeof(msg), "{\"type\":\"event\",\"btn\":\"%s\"}", name);
+  reply(msg);
 }
 
 void protocol_poll(AppState &state) {
